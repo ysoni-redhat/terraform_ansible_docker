@@ -1,0 +1,93 @@
+---
+- name: Install Docker and Docker Compose
+  hosts: all
+  become: true
+  tasks:
+    - name: Update apt packages
+      apt:
+        update_cache: yes
+
+          #- name: Upgrade all packages
+          #apt:
+          #upgrade: dist
+
+    - name: Install Ansible
+      apt:
+        name: ansible
+        state: present
+
+    - name: Install SSHPASS
+      apt:
+        name: sshpass
+        state: present
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+
+    - name: Get OS type (uname -s)
+      command: uname -s
+      register: uname_s
+
+    - name: Get architecture type (uname -m)
+      command: uname -m
+      register: uname_m
+
+    - name: Download Docker Compose
+      get_url:
+        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ uname_s.stdout }}-{{ uname_m.stdout }}"
+        dest: /usr/local/bin/docker-compose
+        mode: '0755'
+
+    - name: Create Docker network
+      command: docker network create --subnet=192.168.2.0/24 mynet12
+      ignore_errors: true  # Ignore errors if network already exists
+
+    - name: Install Python 3 pip
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: Install Python Docker SDK
+      pip:
+        name: docker
+        state: present
+
+    - name: Delete container-1
+      command: sudo docker rm -f web1
+
+    - name: Spin container-1
+      command: sudo docker run --net mynet12 --ip 192.168.2.10 -h demo1.example.com -p 9080:80 -p 2020:22 -itd --name web1 yogi9312/ubuntu:14.04 /bin/bash
+
+    - name: Generate passwordless SSH key
+      command: ssh-keygen -f /root/.ssh/id_rsa -t rsa -N ""
+      args:
+        creates: /root/.ssh/id_rsa
+
+    - name: Restart SSH service on all containers
+      command: docker exec web1 service ssh restart
+
+    - name: SSH Configuration for container
+      command: sudo docker exec web1 mkdir /root/.ssh
+
+    - name: SSH Configuration for container
+      command: sudo docker exec web1 chmod 700 /root/.ssh
+
+    - name: Copy public SSH key to authorized_keys
+      command: docker cp /root/.ssh/id_rsa.pub web1:/root/.ssh/authorized_keys
+
+    - name: Set permissions for authorized_keys
+      command: docker exec web1 chown root:root /root/.ssh/authorized_keys
