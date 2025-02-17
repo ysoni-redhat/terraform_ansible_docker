@@ -91,3 +91,6 @@
 
     - name: Set permissions for authorized_keys
       command: docker exec web1 chown root:root /root/.ssh/authorized_keys
+
+    - name: Set permissions for authorized_keys
+      command: docker exec web1 bash -c 'echo "root:root" | chpasswd'
