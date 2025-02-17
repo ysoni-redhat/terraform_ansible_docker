@@ -38,19 +38,6 @@
         groups: docker
         append: yes
 
-    - name: Get OS type (uname -s)
-      command: uname -s
-      register: uname_s
-
-    - name: Get architecture type (uname -m)
-      command: uname -m
-      register: uname_m
-
-    - name: Download Docker Compose
-      get_url:
-        url: "https://github.com/docker/compose/releases/latest/download/docker-compose-{{ uname_s.stdout }}-{{ uname_m.stdout }}"
-        dest: /usr/local/bin/docker-compose
-        mode: '0755'
 
     - name: Create Docker network
       command: docker network create --subnet=192.168.2.0/24 mynet12
@@ -94,3 +81,11 @@
 
     - name: Set permissions for authorized_keys
       command: docker exec web1 bash -c 'echo "root:root" | chpasswd'
+
+    - name: Clone the ansible configuration from GitHub
+      git:
+        repo: "https://github.com/ysoni-redhat/ansible_web_configure.git"
+        dest: "/home/ubuntu"
+        version: main
+        force: yes
+
