@@ -1,29 +1,26 @@
 ---
-- name: Install Docker and Docker Compose
+- name: Install Docker and Docker Compose on Amazon Linux
   hosts: all
   become: true
   tasks:
-    - name: Update apt packages
-      apt:
-        update_cache: yes
-
-          #- name: Upgrade all packages
-          #apt:
-          #upgrade: dist
+    - name: Update yum packages
+      dnf:
+        name: '*'
+        state: latest
 
     - name: Install Ansible
-      apt:
+      dnf:
         name: ansible
         state: present
 
     - name: Install SSHPASS
-      apt:
+      dnf:
         name: sshpass
         state: present
 
     - name: Install Docker
-      apt:
-        name: docker.io
+      dnf:
+        name: docker
         state: present
 
     - name: Start and enable Docker service
@@ -32,60 +29,89 @@
         enabled: yes
         state: started
 
-    - name: Add ubuntu user to docker group
+    - name: Add ec2-user to docker group
       user:
-        name: ubuntu
+        name: ec2-user
         groups: docker
         append: yes
-
 
     - name: Create Docker network
       command: docker network create --subnet=192.168.2.0/24 mynet12
       ignore_errors: true  # Ignore errors if network already exists
 
     - name: Install Python 3 pip
-      apt:
+      dnf:
         name: python3-pip
         state: present
 
-    - name: Install Python Docker SDK
-      pip:
-        name: docker
-        state: present
+          #- name: Install Python Docker SDK
+          #pip:
+          #name: docker
+          #state: present
 
     - name: Delete container-1
-      command: sudo docker rm -f web1
+      command: docker rm -f web1
+      ignore_errors: true
 
     - name: Spin container-1
-      command: sudo docker run --net mynet12 --ip 192.168.2.10 -h demo1.example.com -p 9080:80 -p 2020:22 -itd --name web1 yogi9312/ubuntu:14.04 /bin/bash
+      command: "{{ item }}"
+      loop:
+        - docker run --net mynet12 --ip 192.168.2.10 -h demo1.example.com -p 9080:80 -p 2020:22 -itd --name web1 yogi9312/ubuntu:14.04 /bin/bash
+        - docker run --net mynet12 --ip 192.168.2.11 -h demo2.example.com -p 9081:80 -p 2021:22 -itd --name web2 yogi9312/ubuntu:14.04 /bin/bash
+        - docker run --net mynet12 --ip 192.168.2.12 -h demo3.example.com -p 9082:80 -p 2022:22 -itd --name web3 yogi9312/ubuntu:14.04 /bin/bash
+
 
     - name: Generate passwordless SSH key
       command: ssh-keygen -f /root/.ssh/id_rsa -t rsa -N ""
       args:
         creates: /root/.ssh/id_rsa
 
-    - name: Restart SSH service on all containers
-      command: docker exec web1 service ssh restart
+    - name: Restart SSH service on container
+      command: "{{ item }}"
+      loop:
+        - docker exec web1 service ssh restart
+        - docker exec web2 service ssh restart
+        - docker exec web3 service ssh restart
 
     - name: SSH Configuration for container
-      command: sudo docker exec web1 mkdir /root/.ssh
+      command: "{{ item }}"
+      loop: 
+        - docker exec web1 mkdir -p /root/.ssh
+        - docker exec web2 mkdir -p /root/.ssh
+        - docker exec web3 mkdir -p /root/.ssh
 
-    - name: SSH Configuration for container
-      command: sudo docker exec web1 chmod 700 /root/.ssh
+    - name: Set permissions for .ssh directory
+      command: "{{ item }}"
+      loop: 
+        - docker exec web1 chmod 700 /root/.ssh
+        - docker exec web2 chmod 700 /root/.ssh
+        - docker exec web3 chmod 700 /root/.ssh
 
     - name: Copy public SSH key to authorized_keys
-      command: docker cp /root/.ssh/id_rsa.pub web1:/root/.ssh/authorized_keys
+      command: "{{ item }}"
+      loop: 
+        - docker cp /root/.ssh/id_rsa.pub web1:/root/.ssh/authorized_keys
+        - docker cp /root/.ssh/id_rsa.pub web2:/root/.ssh/authorized_keys
+        - docker cp /root/.ssh/id_rsa.pub web3:/root/.ssh/authorized_keys
 
     - name: Set permissions for authorized_keys
-      command: docker exec web1 chown root:root /root/.ssh/authorized_keys
+      command: "{{ item }}"
+      loop: 
+        - docker exec web1 chmod 600 /root/.ssh/authorized_keys
+        - docker exec web2 chmod 600 /root/.ssh/authorized_keys
+        - docker exec web3 chmod 600 /root/.ssh/authorized_keys
 
-    - name: Set permissions for authorized_keys
-      command: docker exec web1 bash -c 'echo "root:root" | chpasswd'
+    - name: Set root password for container
+      command: "{{ item }}"
+      loop: 
+        - docker exec web1 bash -c 'echo "root:root" | chpasswd'
+        - docker exec web2 bash -c 'echo "root:root" | chpasswd'
+        - docker exec web3 bash -c 'echo "root:root" | chpasswd'
 
     - name: Clone the ansible configuration from GitHub
       git:
         repo: "https://github.com/ysoni-redhat/ansible_web_configure.git"
-        dest: "/home/ubuntu"
+        dest: "/home/ec2-user/config"
         version: main
         force: yes
 

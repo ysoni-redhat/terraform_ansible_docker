@@ -74,6 +74,30 @@ resource "aws_security_group" "allow_ssh_http" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # Add the rule to allow traffic on port 9090
+  ingress {
+    from_port   = 9080
+    to_port     = 9080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Add the rule to allow traffic on port 9090
+  ingress {
+    from_port   = 9081
+    to_port     = 9081
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Add the rule to allow traffic on port 9090
+  ingress {
+    from_port   = 9082
+    to_port     = 9082
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   egress {
     from_port   = 0
     to_port     = 0
@@ -84,7 +108,7 @@ resource "aws_security_group" "allow_ssh_http" {
 
 # Launch an EC2 instance
 resource "aws_instance" "my_instance" {
-  ami                    = "ami-023a307f3d27ea427"  # Update with the correct AMI ID
+  ami                    = "ami-0ddfba243cbee3768"  # Update with the correct AMI ID
   instance_type          = "t2.micro"
   key_name               = "terraform"
   subnet_id              = aws_subnet.my_subnet.id
@@ -103,7 +127,7 @@ resource "null_resource" "ansible_provision" {
   provisioner "local-exec" {
     command = <<EOT
       sleep 25  # Give some time for SSH service to start
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u ubuntu -e "ansible_python_interpreter=/usr/bin/python3" -i "${aws_instance.my_instance.public_ip}," --private-key terraform.pem install_docker.yml
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -u ec2-user -e "ansible_python_interpreter=/usr/bin/python3" -i "${aws_instance.my_instance.public_ip}," --private-key terraform.pem install_docker.yml
 
     EOT
   }
@@ -115,6 +139,6 @@ output "public_ip" {
 }
 
 output "ssh_command" {
-  value = "ssh -i terraform.pem ubuntu@${aws_instance.my_instance.public_ip}"
+  value = "ssh -i terraform.pem ec2-user@${aws_instance.my_instance.public_ip}"
 }
 
